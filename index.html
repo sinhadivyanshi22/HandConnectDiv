@@ -360,6 +360,58 @@
             font-size: 16px;
 
         }
+
+        /* ===============================
+   FUTURISTIC CORNERS
+=============================== */
+
+        .corner {
+            position: absolute;
+            width: 130px;
+            height: 130px;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        /* TOP LEFT */
+
+        .corner.tl {
+            top: 40px;
+            left: 40px;
+            border-top: 2px solid #ff3dd8;
+            border-left: 2px solid #ff3dd8;
+            border-top-left-radius: 18px;
+        }
+
+        /* TOP RIGHT */
+
+        .corner.tr {
+            top: 40px;
+            right: 40px;
+            border-top: 2px solid #38d8ff;
+            border-right: 2px solid #38d8ff;
+            border-top-right-radius: 18px;
+        }
+
+        /* BOTTOM LEFT */
+
+        .corner.bl {
+            bottom: 40px;
+            left: 40px;
+            border-left: 2px solid #ff3dd8;
+            border-bottom: 2px solid #ff3dd8;
+            border-bottom-left-radius: 18px;
+        }
+
+        /* BOTTOM RIGHT */
+
+        .corner.br {
+            bottom: 40px;
+            right: 40px;
+            border-right: 2px solid #38d8ff;
+            border-bottom: 2px solid #38d8ff;
+            border-bottom-right-radius: 18px;
+        }
     </style>
 </head>
 
@@ -369,51 +421,54 @@
     <div id="startOverlay">
 
 
-        <div class="hero">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
 
 
-            <div class="top-badge">
-                <span></span>
-                AI POWERED EXPERIENCE
-                <span></span>
+        <div class="top-badge">
+            <span></span>
+            AI POWERED EXPERIENCE
+            <span></span>
+        </div>
+
+        <h1 class="hero-title">
+            DIV'S <span>AURA AR</span>
+        </h1>
+
+        <p class="hero-subtitle">
+            Transform your hand movements into an
+            immersive augmented reality experience.
+        </p>
+
+        <button class="start-btn" id="startBtn">
+            OPEN TO EXPERIENCE ✨
+        </button>
+
+        <div class="hero-features">
+
+            <div class="feature">
+                <div class="icon">◎</div>
+                <h3>REAL-TIME</h3>
+                <p>Tracking</p>
             </div>
 
-            <h1 class="hero-title">
-                DIV'S <span>AURA AR</span>
-            </h1>
+            <div class="feature">
+                <div class="icon">〰</div>
+                <h3>AUDIO</h3>
+                <p>Reactive</p>
+            </div>
 
-            <p class="hero-subtitle">
-                Transform your hand movements into an
-                immersive augmented reality experience.
-            </p>
-
-            <button class="start-btn" id="startBtn">
-                OPEN TO EXPERIENCE ✨
-            </button>
-
-            <div class="hero-features">
-
-                <div class="feature">
-                    <div class="icon">◎</div>
-                    <h3>REAL-TIME</h3>
-                    <p>Tracking</p>
-                </div>
-
-                <div class="feature">
-                    <div class="icon">〰</div>
-                    <h3>AUDIO</h3>
-                    <p>Reactive</p>
-                </div>
-
-                <div class="feature">
-                    <div class="icon">⚡</div>
-                    <h3>IMMERSIVE</h3>
-                    <p>Visuals</p>
-                </div>
-
+            <div class="feature">
+                <div class="icon">⚡</div>
+                <h3>IMMERSIVE</h3>
+                <p>Visuals</p>
             </div>
 
         </div>
+
+    </div>
 
     </div>
 
