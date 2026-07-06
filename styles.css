@@ -20,6 +20,10 @@ body {
     overflow: hidden;
 }
 
+/* ============================================
+   VIDEO & CANVAS LAYERS
+   ============================================ */
+
 .video-container {
     position: absolute;
     width: 100vw;
@@ -67,7 +71,10 @@ body {
     /* We use mix-blend-mode for the glowing effects in canvas */
 }
 
-/* UI Overlays */
+/* ============================================
+   HUD OVERLAY
+   ============================================ */
+
 #hud {
     position: absolute;
     top: 20px;
@@ -77,6 +84,7 @@ body {
     flex-direction: column;
     gap: 15px;
     pointer-events: none;
+    transition: opacity 0.5s ease;
 }
 
 .panel {
@@ -107,7 +115,10 @@ body {
     color: var(--accent);
 }
 
-/* Themes */
+/* ============================================
+   THEME SWITCHER
+   ============================================ */
+
 #themes {
     position: absolute;
     bottom: 20px;
@@ -133,6 +144,12 @@ body {
     cursor: pointer;
     transition: 0.3s ease;
     font-weight: 500;
+    font-family: inherit;
+    font-size: 0.85rem;
+}
+
+.theme-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .theme-btn.active {
@@ -141,7 +158,10 @@ body {
     text-shadow: 0 0 10px white;
 }
 
-/* Start Overlay */
+/* ============================================
+   START OVERLAY (HERO)
+   ============================================ */
+
 #startOverlay {
     position: absolute;
     inset: 0;
@@ -152,7 +172,13 @@ body {
     justify-content: center;
     align-items: center;
     backdrop-filter: blur(10px);
-    transition: opacity 0.5s ease;
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+#startOverlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
 }
 
 .start-btn {
@@ -167,6 +193,7 @@ body {
     letter-spacing: 4px;
     color: white;
     font-weight: 500;
+    font-family: inherit;
     background: linear-gradient(90deg, #ff00c8, #1f6fff);
     box-shadow:
         0 0 25px rgba(255, 0, 200, .6),
@@ -179,6 +206,10 @@ body {
     box-shadow:
         0 0 45px rgba(255, 0, 200, .8),
         0 0 70px rgba(0, 180, 255, .8);
+}
+
+.start-btn:active {
+    transform: scale(0.98);
 }
 
 .hidden {
@@ -312,4 +343,597 @@ body {
     border-right: 2px solid #38d8ff;
     border-bottom: 2px solid #38d8ff;
     border-bottom-right-radius: 18px;
+}
+
+/* ============================================
+   LOADING OVERLAY
+   ============================================ */
+
+#loadingOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 16, 0.95);
+    z-index: 150;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(20px);
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+#loadingOverlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.loading-spinner {
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+.spinner-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid transparent;
+}
+
+.spinner-ring:nth-child(1) {
+    border-top-color: #ff00c8;
+    animation: spinnerRotate 1.2s linear infinite;
+}
+
+.spinner-ring:nth-child(2) {
+    inset: 8px;
+    border-right-color: #00d9ff;
+    animation: spinnerRotate 1.6s linear infinite reverse;
+}
+
+.spinner-ring:nth-child(3) {
+    inset: 16px;
+    border-bottom-color: #00ffcc;
+    animation: spinnerRotate 2s linear infinite;
+}
+
+@keyframes spinnerRotate {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.loading-text {
+    font-size: 1.3rem;
+    font-weight: 300;
+    letter-spacing: 4px;
+    color: white;
+    text-transform: uppercase;
+}
+
+.loading-subtext {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 2px;
+}
+
+.loading-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.loading-dots span {
+    font-size: 2rem;
+    color: var(--accent);
+    animation: loadingDotPulse 1.4s ease-in-out infinite;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes loadingDotPulse {
+
+    0%,
+    80%,
+    100% {
+        opacity: 0.2;
+        transform: scale(0.8);
+    }
+
+    40% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* ============================================
+   TUTORIAL OVERLAY
+   ============================================ */
+
+#tutorialOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 200;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(8px);
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+}
+
+#tutorialOverlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.tutorial-card {
+    background: rgba(15, 18, 35, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    padding: 40px;
+    max-width: 480px;
+    width: 90%;
+    backdrop-filter: blur(20px);
+    box-shadow:
+        0 25px 80px rgba(0, 0, 0, 0.6),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    animation: tutorialSlideIn 0.4s ease-out;
+}
+
+@keyframes tutorialSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.tutorial-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    margin-bottom: 30px;
+    text-align: center;
+    background: linear-gradient(90deg, #ff00c8, #00d9ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.tutorial-gestures {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-bottom: 30px;
+}
+
+.tutorial-gesture {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    transition: background 0.3s ease;
+}
+
+.tutorial-gesture:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.tutorial-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tutorial-info h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+    color: white;
+}
+
+.tutorial-info p {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 1px;
+}
+
+.tutorial-close-btn {
+    width: 100%;
+    height: 52px;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    font-size: 1rem;
+    letter-spacing: 4px;
+    color: white;
+    font-weight: 600;
+    font-family: inherit;
+    background: linear-gradient(90deg, #ff00c8, #1f6fff);
+    box-shadow: 0 0 20px rgba(255, 0, 200, .3);
+    transition: 0.3s ease;
+}
+
+.tutorial-close-btn:hover {
+    box-shadow: 0 0 35px rgba(255, 0, 200, .6);
+    transform: translateY(-2px);
+}
+
+/* ============================================
+   ERROR OVERLAY
+   ============================================ */
+
+#errorOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(5, 5, 16, 0.95);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(20px);
+    transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+#errorOverlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+}
+
+.error-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+    max-width: 500px;
+    padding: 40px;
+}
+
+.error-icon {
+    font-size: 4rem;
+    animation: errorPulse 2s ease-in-out infinite;
+}
+
+@keyframes errorPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.error-content h2 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: #ff6b6b;
+}
+
+.error-content p {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.7;
+    letter-spacing: 1px;
+}
+
+/* ============================================
+   CONTROL BUTTONS
+   ============================================ */
+
+#controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: opacity 0.5s ease;
+}
+
+.control-btn {
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.3s ease;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.08);
+    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.4);
+}
+
+.control-btn:active {
+    transform: scale(0.95);
+}
+
+.control-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+/* ============================================
+   SCREENSHOT FLASH & TOAST
+   ============================================ */
+
+#screenshotFlash {
+    position: fixed;
+    inset: 0;
+    background: white;
+    z-index: 999;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+}
+
+#screenshotFlash.flash {
+    opacity: 0.8;
+}
+
+#screenshotToast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(15, 18, 35, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(16px);
+    color: white;
+    padding: 14px 28px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 2px;
+    z-index: 500;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+#screenshotToast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================
+   MOBILE RESPONSIVENESS
+   ============================================ */
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.8rem;
+        letter-spacing: 5px;
+        margin-bottom: 20px;
+    }
+
+    .hero-subtitle {
+        font-size: 0.85rem;
+        margin-bottom: 30px;
+        letter-spacing: 1px;
+    }
+
+    .top-badge {
+        font-size: 0.7rem;
+        letter-spacing: 4px;
+        gap: 10px;
+        margin-bottom: 25px;
+    }
+
+    .top-badge span {
+        width: 50px;
+    }
+
+    .start-btn {
+        width: 90%;
+        height: 65px;
+        font-size: 1.1rem;
+        letter-spacing: 2px;
+    }
+
+    .hero-features {
+        gap: 40px;
+        margin-top: 40px;
+    }
+
+    .feature h3 {
+        font-size: 13px;
+    }
+
+    .feature p {
+        font-size: 13px;
+    }
+
+    .icon {
+        font-size: 24px;
+    }
+
+    .corner {
+        width: 70px;
+        height: 70px;
+    }
+
+    .corner.tl {
+        top: 20px;
+        left: 20px;
+    }
+
+    .corner.tr {
+        top: 20px;
+        right: 20px;
+    }
+
+    .corner.bl {
+        bottom: 20px;
+        left: 20px;
+    }
+
+    .corner.br {
+        bottom: 20px;
+        right: 20px;
+    }
+
+    #hud {
+        top: 10px;
+        left: 10px;
+    }
+
+    .panel {
+        padding: 10px 14px;
+    }
+
+    .stat {
+        font-size: 0.75rem;
+        min-width: 140px;
+    }
+
+    #themes {
+        bottom: 10px;
+        gap: 5px;
+        padding: 6px;
+        flex-wrap: wrap;
+        max-width: 95%;
+        justify-content: center;
+    }
+
+    .theme-btn {
+        padding: 6px 12px;
+        font-size: 0.75rem;
+    }
+
+    #controls {
+        top: 10px;
+        right: 10px;
+        gap: 8px;
+    }
+
+    .control-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+    }
+
+    .control-icon {
+        font-size: 1rem;
+    }
+
+    .tutorial-card {
+        padding: 25px;
+    }
+
+    .tutorial-title {
+        font-size: 1.2rem;
+    }
+
+    .loading-text {
+        font-size: 1rem;
+        letter-spacing: 2px;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 2rem;
+        letter-spacing: 3px;
+    }
+
+    .hero-features {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .start-btn {
+        height: 55px;
+        font-size: 0.9rem;
+    }
+
+    .hero-subtitle {
+        font-size: 0.78rem;
+    }
+
+    .top-badge {
+        font-size: 0.6rem;
+    }
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+/* Focus indicators for keyboard navigation */
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .loading-spinner {
+        animation: none;
+    }
+
+    .spinner-ring {
+        animation: none;
+        border-color: var(--accent);
+    }
 }

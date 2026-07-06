@@ -1,5 +1,23 @@
 /** 
- * GLOBALS & CONFIG
+ * =============================================
+ * CONSTANTS & CONFIG
+ * =============================================
+ */
+const PINCH_THRESHOLD = 0.05;          // 5% of screen distance
+const LIGHTNING_DISTANCE = 150;         // px — max distance for lightning arcs
+const PARTICLE_DECAY = 0.02;            // Per-frame life loss
+const PARTICLE_GRAVITY = 0.1;           // Downward acceleration
+const MAX_PARTICLES = 500;              // Hard cap to prevent memory leaks
+const MAX_RIPPLES = 20;                 // Hard cap for shockwaves
+const MAX_TRAIL_LENGTH = 25;            // Positions stored per fingertip trail
+const ENERGY_ORB_MAX_DIST = 400;        // px — max palm distance for orb
+const UI_UPDATE_INTERVAL = 250;         // ms — throttle DOM updates
+const FINGER_TIPS = [4, 8, 12, 16, 20];
+
+/**
+ * =============================================
+ * GLOBALS
+ * =============================================
  */
 const videoElement = document.querySelector('.input_video');
 const bgCanvas = document.getElementById('bgCanvas');
@@ -14,9 +32,10 @@ let time = 0;
 let lastTime = performance.now();
 let framesThisSecond = 0;
 let lastFpsTime = performance.now();
+let currentFPS = 0;
 
-let currentHands = []; // Latest data from MediaPipe
-let handVelocities = 0; // Average hand movement speed
+let currentHands = [];
+let handVelocities = 0;
 
 // Theme Config
 let currentTheme = 'Rainbow';
@@ -28,20 +47,28 @@ const themes = {
     'Galaxy': (t, index, total) => `hsl(${260 + Math.sin(t * 2 + index) * 40}, 100%, 65%)`
 };
 
-// Physics Engines Data
+// Physics
 let particles = [];
 let ripples = [];
-const FINGER_TIPS = [4, 8, 12, 16, 20];
+
+// Finger trails: trails[handIndex][fingerIndex] = [{x, y}, ...]
+let trails = [[], []];
 
 // Matrix Background
 let matrixColumns = [];
 const fontSize = 16;
 let maxColumns = 0;
 
-// Audio Node References
+// Theme-specific background state
+let bgParticles = []; // For Lava embers, Ocean bubbles, Galaxy stars
+const MAX_BG_PARTICLES = 80;
+
+// Audio
 let audioCtx = null;
 let humOsc = null;
 let humGain = null;
+let masterGain = null;
+let isMuted = false;
 
 // UI Elements
 const uiHands = document.getElementById('ui-hands');
@@ -49,8 +76,16 @@ const uiFps = document.getElementById('ui-fps');
 const uiGesture = document.getElementById('ui-gesture');
 const uiSpread = document.getElementById('ui-spread');
 
+// UI update throttling
+let lastUIUpdate = 0;
+let pendingUIHands = 0;
+let pendingUIGesture = 'None';
+let pendingUISpread = '0%';
+
 /**
+ * =============================================
  * INITIALIZATION
+ * =============================================
  */
 function resize() {
     width = window.innerWidth;
@@ -73,26 +108,121 @@ document.querySelectorAll('.theme-btn').forEach(btn => {
         e.target.classList.add('active');
         currentTheme = e.target.getAttribute('data-theme');
         document.documentElement.style.setProperty('--accent', themes[currentTheme](0, 1, 1));
+        // Reset background particles when theme changes
+        bgParticles = [];
     });
 });
 
 // Start button triggers AudioContext and hides overlay
 document.getElementById('startBtn').addEventListener('click', () => {
     document.getElementById('startOverlay').classList.add('hidden');
-    document.getElementById('hud').classList.remove('hidden');
-    document.getElementById('themes').classList.remove('hidden');
+    document.getElementById('loadingOverlay').classList.remove('hidden');
     initAudio();
     initMediaPipe();
-    requestAnimationFrame(renderLoop);
 });
 
+// Retry button
+document.getElementById('retryBtn').addEventListener('click', () => {
+    document.getElementById('errorOverlay').classList.add('hidden');
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    initMediaPipe();
+});
+
+// Tutorial controls
+document.getElementById('tutorialCloseBtn').addEventListener('click', () => {
+    document.getElementById('tutorialOverlay').classList.add('hidden');
+});
+
+document.getElementById('tutorialBtn').addEventListener('click', () => {
+    document.getElementById('tutorialOverlay').classList.remove('hidden');
+});
+
+// Mute toggle
+document.getElementById('muteBtn').addEventListener('click', () => {
+    isMuted = !isMuted;
+    const icon = document.querySelector('#muteBtn .control-icon');
+    if (isMuted) {
+        icon.textContent = '🔇';
+        if (masterGain) masterGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+    } else {
+        icon.textContent = '🔊';
+        if (masterGain) masterGain.gain.setTargetAtTime(1, audioCtx.currentTime, 0.05);
+    }
+});
+
+// Screenshot
+document.getElementById('screenshotBtn').addEventListener('click', takeScreenshot);
+
+// Fullscreen toggle
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+        document.querySelector('#fullscreenBtn .control-icon').textContent = '⊡';
+    } else {
+        document.exitFullscreen();
+        document.querySelector('#fullscreenBtn .control-icon').textContent = '⛶';
+    }
+});
+
+document.addEventListener('fullscreenchange', () => {
+    const icon = document.querySelector('#fullscreenBtn .control-icon');
+    icon.textContent = document.fullscreenElement ? '⊡' : '⛶';
+});
 
 /**
+ * =============================================
+ * SCREENSHOT
+ * =============================================
+ */
+function takeScreenshot() {
+    // Flash effect
+    const flash = document.getElementById('screenshotFlash');
+    flash.classList.add('flash');
+    setTimeout(() => flash.classList.remove('flash'), 150);
+
+    // Composite canvases
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+
+    // Draw video frame (mirrored)
+    tempCtx.save();
+    tempCtx.translate(width, 0);
+    tempCtx.scale(-1, 1);
+    tempCtx.drawImage(videoElement, 0, 0, width, height);
+    tempCtx.restore();
+
+    // Draw background canvas
+    tempCtx.drawImage(bgCanvas, 0, 0);
+    // Draw main canvas
+    tempCtx.drawImage(mainCanvas, 0, 0);
+
+    // Download
+    const link = document.createElement('a');
+    link.download = `aura-ar-${Date.now()}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+
+    // Show toast
+    const toast = document.getElementById('screenshotToast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+/**
+ * =============================================
  * AUDIO ENGINE
+ * =============================================
  */
 function initAudio() {
     try {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Master gain for mute control
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 1;
+        masterGain.connect(audioCtx.destination);
 
         // Continuous Hum
         humOsc = audioCtx.createOscillator();
@@ -104,7 +234,7 @@ function initAudio() {
         humGain.gain.value = 0; // Mute until hands are seen
 
         humOsc.connect(humGain);
-        humGain.connect(audioCtx.destination);
+        humGain.connect(masterGain);
         humOsc.start();
     } catch (e) {
         console.error("Web Audio API failed", e);
@@ -112,23 +242,46 @@ function initAudio() {
 }
 
 function triggerZap() {
-    if (!audioCtx) return;
+    if (!audioCtx || isMuted) return;
     const osc = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
 
-    // Zap sound profile
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+    // Theme-specific zap profiles
+    switch (currentTheme) {
+        case 'Cyberpunk':
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.08);
+            break;
+        case 'Ocean':
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.2);
+            break;
+        case 'Lava':
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(30, audioCtx.currentTime + 0.15);
+            break;
+        case 'Galaxy':
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.25);
+            break;
+        default: // Rainbow
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+    }
 
-    gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+    gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
 
     osc.connect(gainNode);
-    gainNode.connect(audioCtx.destination);
+    gainNode.connect(masterGain);
 
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.15);
+    osc.stop(audioCtx.currentTime + 0.25);
 }
 
 function updateHum(activeHands) {
@@ -154,18 +307,20 @@ function updateHum(activeHands) {
 }
 
 /**
+ * =============================================
  * MATH & STATE LOGIC
+ * =============================================
  */
 function getDist(p1, p2) {
     return Math.hypot(p1.x - p2.x, p1.y - p2.y);
 }
 
-// Convert normalized landmark to specific canvas scale (Note: canvas is horizontally flipped)
+// Convert normalized landmark to canvas coords (canvas is horizontally flipped)
 function mapToCanvas(point) {
     return { x: point.x * width, y: point.y * height };
 }
 
-let lastPinchState = [false, false]; // Prevents rapid re-triggering
+let lastPinchState = [false, false];
 
 function detectGestures() {
     if (!currentHands.length) return;
@@ -176,7 +331,7 @@ function detectGestures() {
         const index = hand[8];
         const dist = getDist(thumb, index);
 
-        const isPinching = dist < 0.05; // 5% of screen screen distance
+        const isPinching = dist < PINCH_THRESHOLD;
 
         if (isPinching && !lastPinchState[idx]) {
             const midpoint = {
@@ -185,27 +340,29 @@ function detectGestures() {
             };
             createShockwave(mapToCanvas(midpoint), themes[currentTheme](time, 1, 1));
             triggerZap();
-            uiGesture.innerText = "PINCH !";
+            pendingUIGesture = "PINCH !";
         }
         lastPinchState[idx] = isPinching;
     });
 
-    // Spread Percentage roughly estimated by distance from Palm(0) to Index(8) and Pinky(20)
+    // Spread Percentage roughly estimated by distance from Index(8) to Pinky(20)
     if (currentHands[0]) {
         const spread = getDist(currentHands[0][8], currentHands[0][20]);
-        // Normalizing spread so max is around 100%
         let spreadPct = Math.min(Math.round(spread * 300), 100);
-        uiSpread.innerText = spreadPct + '%';
+        pendingUISpread = spreadPct + '%';
         if (!lastPinchState.includes(true)) {
-            uiGesture.innerText = spreadPct > 50 ? "Open Hand" : "Fist";
+            pendingUIGesture = spreadPct > 50 ? "Open Hand" : "Fist";
         }
     }
 }
 
 /**
+ * =============================================
  * EFFECTS & PHYSICS
+ * =============================================
  */
 function createParticles(pos, color, count = 3) {
+    if (particles.length >= MAX_PARTICLES) return; // Memory guard
     for (let i = 0; i < count; i++) {
         particles.push({
             x: pos.x,
@@ -220,6 +377,7 @@ function createParticles(pos, color, count = 3) {
 }
 
 function createShockwave(pos, color) {
+    if (ripples.length >= MAX_RIPPLES) ripples.shift(); // Evict oldest
     ripples.push({
         x: pos.x,
         y: pos.y,
@@ -230,24 +388,322 @@ function createShockwave(pos, color) {
     });
 }
 
-// Background Effect Engine
+/**
+ * =============================================
+ * FINGER TRAIL SYSTEM
+ * =============================================
+ */
+function updateTrails() {
+    currentHands.forEach((hand, handIndex) => {
+        if (!trails[handIndex]) trails[handIndex] = [];
+        FINGER_TIPS.forEach((tipIndex, fingerIdx) => {
+            if (!trails[handIndex][fingerIdx]) trails[handIndex][fingerIdx] = [];
+            const pt = mapToCanvas(hand[tipIndex]);
+            trails[handIndex][fingerIdx].push({ x: pt.x, y: pt.y });
+            if (trails[handIndex][fingerIdx].length > MAX_TRAIL_LENGTH) {
+                trails[handIndex][fingerIdx].shift();
+            }
+        });
+    });
+    // Clear trails for hands no longer present
+    for (let i = currentHands.length; i < 2; i++) {
+        if (trails[i]) {
+            trails[i].forEach(trail => {
+                if (trail && trail.length > 0) trail.shift(); // Fade out gracefully
+            });
+        }
+    }
+}
+
+function drawTrails() {
+    trails.forEach((handTrails, handIndex) => {
+        if (!handTrails) return;
+        handTrails.forEach((trail, fingerIdx) => {
+            if (!trail || trail.length < 3) return;
+            const col = themes[currentTheme](time, fingerIdx, FINGER_TIPS.length);
+
+            // Draw tapered ribbon using segments with increasing width & opacity
+            for (let i = 1; i < trail.length; i++) {
+                const alpha = i / trail.length;
+                const lineWidth = alpha * 5;
+
+                ctx.beginPath();
+                ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+
+                // Smooth curve using quadratic bezier
+                if (i < trail.length - 1) {
+                    const midX = (trail[i].x + trail[i + 1].x) / 2;
+                    const midY = (trail[i].y + trail[i + 1].y) / 2;
+                    ctx.quadraticCurveTo(trail[i].x, trail[i].y, midX, midY);
+                } else {
+                    ctx.lineTo(trail[i].x, trail[i].y);
+                }
+
+                ctx.strokeStyle = col;
+                ctx.lineWidth = lineWidth;
+                ctx.globalAlpha = alpha * 0.6;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = col;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
+        });
+    });
+}
+
+/**
+ * =============================================
+ * ENERGY ORB (two-hand effect)
+ * =============================================
+ */
+function drawEnergyOrb() {
+    if (currentHands.length < 2) return;
+
+    const palm1 = mapToCanvas(currentHands[0][0]);
+    const palm2 = mapToCanvas(currentHands[1][0]);
+
+    const midX = (palm1.x + palm2.x) / 2;
+    const midY = (palm1.y + palm2.y) / 2;
+    const dist = getDist(palm1, palm2);
+
+    if (dist > ENERGY_ORB_MAX_DIST) return;
+
+    const intensity = 1 - Math.min(dist / ENERGY_ORB_MAX_DIST, 1);
+    const orbRadius = 15 + intensity * 70;
+    const pulseRadius = orbRadius + Math.sin(time * 8) * 10 * intensity;
+    const themeColor = themes[currentTheme](time, 0, 1);
+
+    ctx.save();
+
+    // Outer glow layers
+    for (let layer = 3; layer >= 0; layer--) {
+        const r = pulseRadius * (1.5 + layer * 0.8);
+        const alpha = intensity * 0.08 * (4 - layer);
+
+        ctx.beginPath();
+        ctx.arc(midX, midY, r, 0, Math.PI * 2);
+        ctx.fillStyle = themeColor;
+        ctx.globalAlpha = alpha;
+        ctx.fill();
+    }
+
+    // Core orb — white center
+    const coreGrad = ctx.createRadialGradient(midX, midY, 0, midX, midY, pulseRadius);
+    coreGrad.addColorStop(0, `rgba(255, 255, 255, ${0.9 * intensity})`);
+    coreGrad.addColorStop(0.4, `rgba(255, 255, 255, ${0.3 * intensity})`);
+    coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.beginPath();
+    ctx.arc(midX, midY, pulseRadius, 0, Math.PI * 2);
+    ctx.fillStyle = coreGrad;
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 50 * intensity;
+    ctx.shadowColor = themeColor;
+    ctx.fill();
+
+    // Spark particles around orb
+    if (intensity > 0.3 && Math.random() > 0.5) {
+        const angle = Math.random() * Math.PI * 2;
+        const sparkDist = pulseRadius * (0.8 + Math.random() * 0.5);
+        createParticles({
+            x: midX + Math.cos(angle) * sparkDist,
+            y: midY + Math.sin(angle) * sparkDist
+        }, themeColor, 1);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * =============================================
+ * PER-FINGER AURA GLOW
+ * =============================================
+ */
+function drawFingerAura(pt, color) {
+    ctx.save();
+    // Outer volumetric glow — multiple layers
+    for (let i = 3; i >= 0; i--) {
+        const r = 6 + i * 6;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.08 * (4 - i);
+        ctx.fill();
+    }
+    // Bright center
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.globalAlpha = 0.9;
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = color;
+    ctx.fill();
+    ctx.restore();
+}
+
+/**
+ * =============================================
+ * THEME-SPECIFIC BACKGROUNDS
+ * =============================================
+ */
+function spawnBgParticle() {
+    if (bgParticles.length >= MAX_BG_PARTICLES) return;
+
+    switch (currentTheme) {
+        case 'Lava':
+            bgParticles.push({
+                x: Math.random() * width,
+                y: height + 10,
+                vx: (Math.random() - 0.5) * 0.5,
+                vy: -(1 + Math.random() * 2),
+                life: 1.0,
+                size: 2 + Math.random() * 3,
+                type: 'ember'
+            });
+            break;
+        case 'Ocean':
+            bgParticles.push({
+                x: Math.random() * width,
+                y: height + 10,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: -(0.3 + Math.random() * 0.8),
+                life: 1.0,
+                size: 3 + Math.random() * 5,
+                type: 'bubble'
+            });
+            break;
+        case 'Galaxy':
+            bgParticles.push({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                vx: 0,
+                vy: 0,
+                life: 0.5 + Math.random() * 0.5,
+                size: 1 + Math.random() * 2,
+                type: 'star',
+                twinkleSpeed: 2 + Math.random() * 4
+            });
+            break;
+        case 'Cyberpunk':
+            // Horizontal scan line
+            bgParticles.push({
+                x: 0,
+                y: Math.random() * height,
+                vx: 0,
+                vy: 1 + Math.random() * 2,
+                life: 1.0,
+                size: 1,
+                type: 'scanline'
+            });
+            break;
+    }
+}
+
+function drawThemeBackground() {
+    // Spawn new background particles periodically
+    if (Math.random() > 0.85) spawnBgParticle();
+
+    for (let i = bgParticles.length - 1; i >= 0; i--) {
+        const p = bgParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+
+        switch (p.type) {
+            case 'ember':
+                p.life -= 0.008;
+                p.vx += (Math.random() - 0.5) * 0.1; // Drift
+                bgCtx.beginPath();
+                bgCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                bgCtx.fillStyle = `rgba(255, ${80 + Math.random() * 80}, 0, ${p.life * 0.7})`;
+                bgCtx.shadowBlur = 10;
+                bgCtx.shadowColor = '#ff4400';
+                bgCtx.fill();
+                bgCtx.shadowBlur = 0;
+                break;
+
+            case 'bubble':
+                p.life -= 0.004;
+                p.vx += (Math.random() - 0.5) * 0.05;
+                bgCtx.beginPath();
+                bgCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                bgCtx.strokeStyle = `rgba(100, 200, 255, ${p.life * 0.4})`;
+                bgCtx.lineWidth = 1;
+                bgCtx.stroke();
+                // Highlight
+                bgCtx.beginPath();
+                bgCtx.arc(p.x - p.size * 0.3, p.y - p.size * 0.3, p.size * 0.25, 0, Math.PI * 2);
+                bgCtx.fillStyle = `rgba(255, 255, 255, ${p.life * 0.3})`;
+                bgCtx.fill();
+                break;
+
+            case 'star':
+                const twinkle = Math.sin(time * p.twinkleSpeed) * 0.5 + 0.5;
+                p.life -= 0.002;
+                bgCtx.beginPath();
+                bgCtx.arc(p.x, p.y, p.size * twinkle, 0, Math.PI * 2);
+                bgCtx.fillStyle = `rgba(200, 180, 255, ${p.life * twinkle})`;
+                bgCtx.shadowBlur = 6;
+                bgCtx.shadowColor = 'rgba(180, 120, 255, 0.5)';
+                bgCtx.fill();
+                bgCtx.shadowBlur = 0;
+                break;
+
+            case 'scanline':
+                p.life -= 0.015;
+                bgCtx.beginPath();
+                bgCtx.moveTo(0, p.y);
+                bgCtx.lineTo(width, p.y);
+                bgCtx.strokeStyle = `rgba(255, 0, 60, ${p.life * 0.15})`;
+                bgCtx.lineWidth = 1;
+                bgCtx.stroke();
+                break;
+        }
+
+        if (p.life <= 0 || p.y < -20) {
+            bgParticles.splice(i, 1);
+        }
+    }
+
+    // Cyberpunk: subtle grid overlay
+    if (currentTheme === 'Cyberpunk') {
+        bgCtx.strokeStyle = 'rgba(0, 240, 255, 0.03)';
+        bgCtx.lineWidth = 1;
+        const gridSize = 60;
+        for (let x = 0; x < width; x += gridSize) {
+            bgCtx.beginPath();
+            bgCtx.moveTo(x, 0);
+            bgCtx.lineTo(x, height);
+            bgCtx.stroke();
+        }
+        for (let y = 0; y < height; y += gridSize) {
+            bgCtx.beginPath();
+            bgCtx.moveTo(0, y);
+            bgCtx.lineTo(width, y);
+            bgCtx.stroke();
+        }
+    }
+}
+
+// Background Effect Engine (Matrix rain — always on but lighter for non-Rainbow themes)
 function drawBackground() {
-    // Use destination-out to fade out the previous frame's drops, leaving a transparent trail
+    // Fade previous frame
     bgCtx.globalCompositeOperation = 'destination-out';
     bgCtx.fillStyle = `rgba(0, 0, 0, ${0.15 + Math.min(handVelocities * 10, 0.5)})`;
     bgCtx.fillRect(0, 0, width, height);
     bgCtx.globalCompositeOperation = 'source-over';
 
-    // Matrix Rain Effect mapping to hand speed
+    // Matrix Rain — intensity varies by theme
+    const matrixIntensity = (currentTheme === 'Rainbow' || currentTheme === 'Cyberpunk') ? 0.95 : 0.98;
+
     bgCtx.fillStyle = themes[currentTheme](time, 1, 1);
     bgCtx.font = fontSize + "px monospace";
 
-    // Matrix speed boosts when hands move fast
     let speedMult = 1 + (handVelocities * 100);
 
     for (let i = 0; i < matrixColumns.length; i++) {
-        // Only draw randomly to keep it sparse like stars/rain
-        if (Math.random() > 0.95) {
+        if (Math.random() > matrixIntensity) {
             const char = String.fromCharCode(0x30A0 + Math.random() * 96);
             bgCtx.fillText(char, i * fontSize, matrixColumns[i] * fontSize);
         }
@@ -258,6 +714,9 @@ function drawBackground() {
             matrixColumns[i] = 0;
         }
     }
+
+    // Draw theme-specific background effects
+    drawThemeBackground();
 }
 
 function updatePhysics() {
@@ -266,8 +725,8 @@ function updatePhysics() {
         let p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
-        p.life -= 0.02;     // Fade out
-        p.vy += 0.1;        // Gravity
+        p.life -= PARTICLE_DECAY;
+        p.vy += PARTICLE_GRAVITY;
 
         if (p.life <= 0) {
             particles.splice(i, 1);
@@ -289,19 +748,45 @@ function updatePhysics() {
         if (r.life <= 0) {
             ripples.splice(i, 1);
         } else {
+            // Double ring for richer shockwave
             ctx.beginPath();
             ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
             ctx.strokeStyle = r.color;
             ctx.lineWidth = 4 * r.life;
             ctx.globalAlpha = r.life;
             ctx.stroke();
+
+            // Inner ring
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, r.radius * 0.6, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2 * r.life;
+            ctx.globalAlpha = r.life * 0.5;
+            ctx.stroke();
         }
     }
-    ctx.globalAlpha = 1.0; // Reset
+    ctx.globalAlpha = 1.0;
 }
 
 /**
+ * =============================================
+ * THROTTLED UI UPDATES
+ * =============================================
+ */
+function updateUI(timestamp) {
+    if (timestamp - lastUIUpdate < UI_UPDATE_INTERVAL) return;
+    lastUIUpdate = timestamp;
+
+    uiHands.innerText = pendingUIHands;
+    uiFps.innerText = currentFPS;
+    uiGesture.innerText = pendingUIGesture;
+    uiSpread.innerText = pendingUISpread;
+}
+
+/**
+ * =============================================
  * MAIN RENDER PIPELINE
+ * =============================================
  */
 function renderLoop(timestamp) {
     requestAnimationFrame(renderLoop);
@@ -313,22 +798,20 @@ function renderLoop(timestamp) {
     // Update FPS Counter
     framesThisSecond++;
     if (timestamp > lastFpsTime + 1000) {
-        uiFps.innerText = framesThisSecond;
+        currentFPS = framesThisSecond;
         framesThisSecond = 0;
         lastFpsTime = timestamp;
     }
 
     drawBackground();
 
-    // The main canvas will clear fully each frame since we handle ghosting via bgCanvas 
-    // BUT user requested trailing motion blur for fingertips.
-    // Instead of clearRect, we fade the main canvas using destination-out to keep it transparent
+    // Fade main canvas for trailing motion blur
     ctx.globalCompositeOperation = 'destination-out';
     ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     ctx.fillRect(0, 0, width, height);
 
-    // Enable Screen mode for additive light effects (like neon bloom)
-    ctx.globalCompositeOperation = 'screen'; // Creates glowy overlapping effects
+    // Enable Screen mode for additive light effects (neon bloom)
+    ctx.globalCompositeOperation = 'screen';
 
     // Render Physics layer
     updatePhysics();
@@ -336,39 +819,45 @@ function renderLoop(timestamp) {
     // Process Hand Logic if present
     if (currentHands.length > 0) {
 
+        // Update finger trails
+        updateTrails();
+
+        // Draw finger trails (ribbon effect)
+        drawTrails();
+
         // 1. Draw Skeleton
         currentHands.forEach((hand, handIndex) => {
             const glowColor = themes[currentTheme](time, handIndex, 2);
 
-            // Draw MediaPipe skeleton connectors using custom styles
+            // Draw MediaPipe skeleton connectors
             drawConnectors(ctx, hand, HAND_CONNECTIONS, {
                 color: glowColor,
                 lineWidth: 2
             });
 
-            // Draw Landmarks with neon bloom
+            // Fingertip rendering with enhanced aura
             ctx.shadowBlur = 15;
             ctx.shadowColor = glowColor;
 
-            // Only draw fingertips with intense bloom and spawn particles
             FINGER_TIPS.forEach((tipIndex, idx) => {
                 const pt = mapToCanvas(hand[tipIndex]);
                 const tipCol = themes[currentTheme](time, idx, FINGER_TIPS.length);
 
-                ctx.beginPath();
-                ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = '#fff';
-                ctx.fill();
+                // Enhanced per-finger aura glow
+                drawFingerAura(pt, tipCol);
 
-                // Generate constant spark particles at fingertips
+                // Spark particles at fingertips
                 if (Math.random() > 0.6) {
                     createParticles(pt, tipCol, 1);
                 }
             });
-            ctx.shadowBlur = 0; // Reset
+            ctx.shadowBlur = 0;
         });
 
-        // 2. Cross-Hand Interactions (Lightning & Gradients)
+        // 2. Energy Orb between palms
+        drawEnergyOrb();
+
+        // 3. Cross-Hand Interactions (Lightning & Gradients)
         if (currentHands.length >= 2) {
             const h1 = currentHands[0];
             const h2 = currentHands[1];
@@ -381,15 +870,21 @@ function renderLoop(timestamp) {
 
                 const col = themes[currentTheme](time, idx, FINGER_TIPS.length);
 
-                // Lightning electric arc when very close (but not touching)
-                if (dist < 150 && Math.random() > 0.5) {
-                    // Draw jagged lightning
+                // Lightning electric arc when very close
+                if (dist < LIGHTNING_DISTANCE && Math.random() > 0.5) {
                     ctx.beginPath();
                     ctx.moveTo(pt1.x, pt1.y);
-                    // Midpoint jitter
-                    const midX = (pt1.x + pt2.x) / 2 + (Math.random() - 0.5) * 50;
-                    const midY = (pt1.y + pt2.y) / 2 + (Math.random() - 0.5) * 50;
-                    ctx.lineTo(midX, midY);
+                    // Multiple segments for more realistic lightning
+                    const segments = 3;
+                    let prevX = pt1.x, prevY = pt1.y;
+                    for (let s = 1; s <= segments; s++) {
+                        const t = s / (segments + 1);
+                        const jitterX = (pt1.x + (pt2.x - pt1.x) * t) + (Math.random() - 0.5) * 50;
+                        const jitterY = (pt1.y + (pt2.y - pt1.y) * t) + (Math.random() - 0.5) * 50;
+                        ctx.lineTo(jitterX, jitterY);
+                        prevX = jitterX;
+                        prevY = jitterY;
+                    }
                     ctx.lineTo(pt2.x, pt2.y);
 
                     ctx.strokeStyle = '#ffffff';
@@ -404,7 +899,6 @@ function renderLoop(timestamp) {
                 ctx.moveTo(pt1.x, pt1.y);
                 ctx.lineTo(pt2.x, pt2.y);
 
-                // Create gradient that shifts over time
                 let grad = ctx.createLinearGradient(pt1.x, pt1.y, pt2.x, pt2.y);
                 grad.addColorStop(0, themes[currentTheme](time, idx, 5));
                 grad.addColorStop(0.5, themes[currentTheme](time, idx + 1, 5));
@@ -418,20 +912,17 @@ function renderLoop(timestamp) {
                 ctx.shadowBlur = 0;
             });
 
-            // B. Mandala drawing if 10 tips are perfectly detected
-            // (Assuming if we have 2 hands, we draw lines connecting all tips in a star)
+            // B. Mandala drawing — connecting all 10 fingertips in a star
             if (h1 && h2) {
-                // Combine all 10 tips
                 let allTips = FINGER_TIPS.map(t => mapToCanvas(h1[t])).concat(
                     FINGER_TIPS.map(t => mapToCanvas(h2[t])));
 
                 ctx.save();
-                // Find center point to draw Mandala
                 let cx = allTips.reduce((sum, p) => sum + p.x, 0) / 10;
                 let cy = allTips.reduce((sum, p) => sum + p.y, 0) / 10;
 
                 ctx.translate(cx, cy);
-                ctx.rotate(time * 0.5); // Slow rotation
+                ctx.rotate(time * 0.5);
 
                 ctx.beginPath();
                 for (let i = 0; i < 10; i++) {
@@ -448,14 +939,35 @@ function renderLoop(timestamp) {
         }
 
         detectGestures();
+    } else {
+        // Clear trails when no hands detected
+        updateTrails();
     }
 
     ctx.globalCompositeOperation = 'source-over'; // Restore
+
+    // Throttled UI update
+    updateUI(timestamp);
 }
 
 /**
+ * =============================================
  * MEDIAPIPE INITIALIZATION
+ * =============================================
  */
+function onTrackingReady() {
+    // Hide loading, show UI
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    document.getElementById('hud').classList.remove('hidden');
+    document.getElementById('themes').classList.remove('hidden');
+    document.getElementById('controls').classList.remove('hidden');
+
+    // Show tutorial on first launch
+    document.getElementById('tutorialOverlay').classList.remove('hidden');
+
+    requestAnimationFrame(renderLoop);
+}
+
 function initMediaPipe() {
     const hands = new Hands({
         locateFile: (file) => {
@@ -470,16 +982,23 @@ function initMediaPipe() {
         minTrackingConfidence: 0.7
     });
 
+    let firstResult = true;
+
     hands.onResults((results) => {
-        if (!audioCtx) return; // Wait for initialization
+        if (!audioCtx) return;
 
-        // Update global state for render loop to read from
-        uiHands.innerText = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+        // First result means model is loaded — hide loading
+        if (firstResult) {
+            firstResult = false;
+            onTrackingReady();
+        }
 
-        // Calculate velocity (rudimentary)
+        // Update state
+        pendingUIHands = results.multiHandLandmarks ? results.multiHandLandmarks.length : 0;
+
+        // Calculate velocity
         if (currentHands.length > 0 && results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             let vSum = 0;
-            // check distance difference on index finger of hand 0 
             const oldP = currentHands[0][8];
             const newP = results.multiHandLandmarks[0][8];
             if (oldP && newP) {
@@ -503,5 +1022,9 @@ function initMediaPipe() {
         facingMode: 'user'
     });
 
-    camera.start();
+    camera.start().catch(err => {
+        console.error("Camera access denied or failed:", err);
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        document.getElementById('errorOverlay').classList.remove('hidden');
+    });
 }

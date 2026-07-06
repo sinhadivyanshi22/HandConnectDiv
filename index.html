@@ -4,10 +4,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="DIV'S AURA AR — Transform your hand movements into an immersive augmented reality experience with real-time AI tracking, reactive audio, and stunning visuals.">
+    <meta property="og:title" content="DIV'S AURA AR">
+    <meta property="og:description" content="AI-powered hand tracking augmented reality experience">
+    <meta property="og:type" content="website">
     <title>DIV'S AURA AR</title>
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700&display=swap"
+        rel="stylesheet">
+
     <!-- MediaPipe Hands CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+        crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"
         crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
@@ -22,13 +34,10 @@
 
     <!-- Start Overlay (Required for AudioContext initialization) -->
     <div id="startOverlay">
-
-
         <div class="corner tl"></div>
         <div class="corner tr"></div>
         <div class="corner bl"></div>
         <div class="corner br"></div>
-
 
         <div class="top-badge">
             <span></span>
@@ -45,34 +54,93 @@
             immersive augmented reality experience.
         </p>
 
-        <button class="start-btn" id="startBtn">
+        <button class="start-btn" id="startBtn" aria-label="Start the AR experience">
             OPEN TO EXPERIENCE ✨
         </button>
 
         <div class="hero-features">
-
             <div class="feature">
                 <div class="icon">◎</div>
                 <h3>REAL-TIME</h3>
                 <p>Tracking</p>
             </div>
-
             <div class="feature">
                 <div class="icon">〰</div>
                 <h3>AUDIO</h3>
                 <p>Reactive</p>
             </div>
-
             <div class="feature">
                 <div class="icon">⚡</div>
                 <h3>IMMERSIVE</h3>
                 <p>Visuals</p>
             </div>
-
         </div>
-
     </div>
 
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="hidden">
+        <div class="loading-content">
+            <div class="loading-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+                <div class="spinner-ring"></div>
+            </div>
+            <p class="loading-text">Initializing AI Hand Tracking</p>
+            <p class="loading-subtext">Please allow camera access when prompted</p>
+            <div class="loading-dots">
+                <span>.</span><span>.</span><span>.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tutorial Overlay -->
+    <div id="tutorialOverlay" class="hidden">
+        <div class="tutorial-card">
+            <h2 class="tutorial-title">Gesture Guide</h2>
+            <div class="tutorial-gestures">
+                <div class="tutorial-gesture">
+                    <div class="tutorial-icon">✋</div>
+                    <div class="tutorial-info">
+                        <h4>Open Hand</h4>
+                        <p>Sparks & real-time tracking</p>
+                    </div>
+                </div>
+                <div class="tutorial-gesture">
+                    <div class="tutorial-icon">🤏</div>
+                    <div class="tutorial-info">
+                        <h4>Pinch</h4>
+                        <p>Shockwave pulse effect</p>
+                    </div>
+                </div>
+                <div class="tutorial-gesture">
+                    <div class="tutorial-icon">🙌</div>
+                    <div class="tutorial-info">
+                        <h4>Two Hands</h4>
+                        <p>Lightning arcs & energy orb</p>
+                    </div>
+                </div>
+                <div class="tutorial-gesture">
+                    <div class="tutorial-icon">✊</div>
+                    <div class="tutorial-info">
+                        <h4>Fist</h4>
+                        <p>Close your hand to detect fist</p>
+                    </div>
+                </div>
+            </div>
+            <button class="tutorial-close-btn" id="tutorialCloseBtn" aria-label="Close gesture guide">GOT IT ✨
+            </button>
+        </div>
+    </div>
+
+    <!-- Error Overlay -->
+    <div id="errorOverlay" class="hidden">
+        <div class="error-content">
+            <div class="error-icon">⚠️</div>
+            <h2>Camera Access Required</h2>
+            <p>This experience needs your camera to track hand movements.<br>Please allow camera access and try again.
+            </p>
+            <button class="start-btn" id="retryBtn" aria-label="Retry camera access">RETRY 🔄</button>
+        </div>
     </div>
 
     <div class="video-container">
@@ -82,7 +150,7 @@
     </div>
 
     <!-- UI Overlay -->
-    <div id="hud" class="hidden">
+    <div id="hud" class="hidden" role="status" aria-live="polite" aria-label="Performance and tracking stats">
         <div class="panel">
             <div class="stat">Hands Detected: <span class="val" id="ui-hands">0</span></div>
             <div class="stat">FPS: <span class="val" id="ui-fps">0</span></div>
@@ -93,13 +161,36 @@
         </div>
     </div>
 
-    <div id="themes" class="hidden">
-        <button class="theme-btn active" data-theme="Rainbow">Rainbow</button>
-        <button class="theme-btn" data-theme="Cyberpunk">Cyberpunk</button>
-        <button class="theme-btn" data-theme="Lava">Lava</button>
-        <button class="theme-btn" data-theme="Ocean">Ocean</button>
-        <button class="theme-btn" data-theme="Galaxy">Galaxy</button>
+    <!-- Control Buttons -->
+    <div id="controls" class="hidden">
+        <button class="control-btn" id="muteBtn" aria-label="Toggle audio mute" title="Mute / Unmute">
+            <span class="control-icon">🔊</span>
+        </button>
+        <button class="control-btn" id="screenshotBtn" aria-label="Take screenshot" title="Screenshot">
+            <span class="control-icon">📸</span>
+        </button>
+        <button class="control-btn" id="fullscreenBtn" aria-label="Toggle fullscreen" title="Fullscreen">
+            <span class="control-icon">⛶</span>
+        </button>
+        <button class="control-btn" id="tutorialBtn" aria-label="Show gesture guide" title="Gesture Guide">
+            <span class="control-icon">❓</span>
+        </button>
     </div>
+
+    <!-- Theme Switcher -->
+    <div id="themes" class="hidden">
+        <button class="theme-btn active" data-theme="Rainbow" aria-label="Rainbow theme">Rainbow</button>
+        <button class="theme-btn" data-theme="Cyberpunk" aria-label="Cyberpunk theme">Cyberpunk</button>
+        <button class="theme-btn" data-theme="Lava" aria-label="Lava theme">Lava</button>
+        <button class="theme-btn" data-theme="Ocean" aria-label="Ocean theme">Ocean</button>
+        <button class="theme-btn" data-theme="Galaxy" aria-label="Galaxy theme">Galaxy</button>
+    </div>
+
+    <!-- Screenshot Flash Effect -->
+    <div id="screenshotFlash"></div>
+
+    <!-- Screenshot Toast -->
+    <div id="screenshotToast">📸 Screenshot saved!</div>
 
     <!-- Link to external JavaScript -->
     <script src="script.js"></script>
