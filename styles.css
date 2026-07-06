@@ -1,0 +1,315 @@
+:root {
+    --bg-color: #050510;
+    --text-color: #ffffff;
+    --glass-bg: rgba(20, 25, 40, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.15);
+    --glass-blur: blur(16px);
+    --accent: #00ffcc;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    overflow: hidden;
+}
+
+.video-container {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+}
+
+.input_video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    /* Mirror */
+    z-index: 0;
+    /* Let the raw camera sit behind */
+    filter: brightness(0.6) contrast(1.1);
+    /* Subtle dark to make neon pop */
+}
+
+/* 
+ * Background Canvas captures the video frame and applies the matrix rain/starfield 
+ */
+#bgCanvas,
+#mainCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+    /* Mirror */
+}
+
+#bgCanvas {
+    z-index: 1;
+    pointer-events: none;
+}
+
+#mainCanvas {
+    z-index: 5;
+    pointer-events: none;
+    /* We use mix-blend-mode for the glowing effects in canvas */
+}
+
+/* UI Overlays */
+#hud {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    pointer-events: none;
+}
+
+.panel {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 15px 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.stat {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.8);
+    min-width: 180px;
+}
+
+.stat:last-child {
+    margin-bottom: 0;
+}
+
+.stat span.val {
+    font-weight: bold;
+    color: var(--accent);
+}
+
+/* Themes */
+#themes {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: 30px;
+    padding: 8px;
+    transition: opacity 0.5s;
+}
+
+.theme-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: 0.3s ease;
+    font-weight: 500;
+}
+
+.theme-btn.active {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    text-shadow: 0 0 10px white;
+}
+
+/* Start Overlay */
+#startOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(10px);
+    transition: opacity 0.5s ease;
+}
+
+.start-btn {
+    margin-top: 10px;
+    width: 500px;
+    max-width: 90%;
+    height: 90px;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    font-size: 1.5rem;
+    letter-spacing: 4px;
+    color: white;
+    font-weight: 500;
+    background: linear-gradient(90deg, #ff00c8, #1f6fff);
+    box-shadow:
+        0 0 25px rgba(255, 0, 200, .6),
+        0 0 50px rgba(0, 180, 255, .5);
+    transition: .35s;
+}
+
+.start-btn:hover {
+    transform: scale(1.04);
+    box-shadow:
+        0 0 45px rgba(255, 0, 200, .8),
+        0 0 70px rgba(0, 180, 255, .8);
+}
+
+.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+    max-width: 1100px;
+    padding: 40px;
+}
+
+.top-badge {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 35px;
+    color: #d0d0d0;
+    letter-spacing: 8px;
+    font-size: .9rem;
+    text-transform: uppercase;
+}
+
+.top-badge span {
+    width: 90px;
+    height: 2px;
+    background: linear-gradient(90deg, #ff00c8, #00d9ff);
+}
+
+.hero-title {
+    font-size: 5rem;
+    font-weight: 100;
+    letter-spacing: 10px;
+    margin-bottom: 30px;
+    color: white;
+    text-shadow:
+        0 0 20px rgba(255, 0, 255, .5),
+        0 0 40px rgba(0, 255, 255, .4);
+}
+
+.hero-title span {
+    color: #9ee7ff;
+}
+
+.hero-subtitle {
+    width: 720px;
+    max-width: 90%;
+    color: #bdbdbd;
+    font-size: 1rem;
+    line-height: 1.8;
+    margin-bottom: 45px;
+    letter-spacing: 2px;
+}
+
+.hero-features {
+    margin-top: 60px;
+    display: flex;
+    gap: 90px;
+}
+
+.feature {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.icon {
+    font-size: 30px;
+    color: #ff58d8;
+    margin-bottom: 18px;
+}
+
+.feature h3 {
+    letter-spacing: 3px;
+    font-size: 16px;
+    color: white;
+    margin-bottom: 8px;
+}
+
+.feature p {
+    color: #bcbcbc;
+    font-size: 16px;
+}
+
+/* FUTURISTIC CORNERS */
+.corner {
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+/* TOP LEFT */
+.corner.tl {
+    top: 40px;
+    left: 40px;
+    border-top: 2px solid #ff3dd8;
+    border-left: 2px solid #ff3dd8;
+    border-top-left-radius: 18px;
+}
+
+/* TOP RIGHT */
+.corner.tr {
+    top: 40px;
+    right: 40px;
+    border-top: 2px solid #38d8ff;
+    border-right: 2px solid #38d8ff;
+    border-top-right-radius: 18px;
+}
+
+/* BOTTOM LEFT */
+.corner.bl {
+    bottom: 40px;
+    left: 40px;
+    border-left: 2px solid #ff3dd8;
+    border-bottom: 2px solid #ff3dd8;
+    border-bottom-left-radius: 18px;
+}
+
+/* BOTTOM RIGHT */
+.corner.br {
+    bottom: 40px;
+    right: 40px;
+    border-right: 2px solid #38d8ff;
+    border-bottom: 2px solid #38d8ff;
+    border-bottom-right-radius: 18px;
+}
