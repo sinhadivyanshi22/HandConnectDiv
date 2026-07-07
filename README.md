@@ -4,7 +4,7 @@
 
 ### AI-Powered Hand Tracking Experience using MediaPipe & HTML5 Canvas
 
-<img src="assets/landing-page.png" width="100%">
+<img src="assets/landingpage.png" width="100%">
 
 <br>
 
