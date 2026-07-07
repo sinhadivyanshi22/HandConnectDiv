@@ -95,7 +95,7 @@ Everything runs entirely inside the browser without requiring any backend.
 
 ## Landing Page
 
-<img src="assets/landing-page.png">
+<img src="assets/landingpage.png">
 
 ---
 
