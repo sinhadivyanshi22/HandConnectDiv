@@ -29,7 +29,7 @@ Experience real-time AI hand tracking directly in your browser.
 
 # 📖 About
 
-HandConnectDiv is an interactive browser-based application that combines **Google MediaPipe Hands**, **HTML5 Canvas**, and **JavaScript** to create a futuristic hand-tracking experience.
+HandConnect is an interactive browser-based application that combines **Google MediaPipe Hands**, **HTML5 Canvas**, and **JavaScript** to create a futuristic hand-tracking experience.
 
 The application detects hand landmarks in real time and renders glowing particles, rainbow connectors, lightning effects, gesture detection, shockwaves, and dynamic visual themes.
 
