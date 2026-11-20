@@ -99,12 +99,6 @@ Everything runs entirely inside the browser without requiring any backend.
 
 ---
 
-## Hand Tracking
-
-<img src="assets/hand-tracking.png">
-
----
-
 ## Interactive Effects
 
 <img src="assets/effects.png">
